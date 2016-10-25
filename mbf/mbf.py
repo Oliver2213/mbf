@@ -76,10 +76,16 @@ class Mbf(object):
 			self.exit("Auto login failed, no username prompt string provided.")
 		self.read_until(self.info['username_prompt'])
 		if self.info['pre_username']:
-			self.send(self.info['pre_username'])
+			if type(self.info['pre_username']) == str:
+				self.send(self.info['pre_username'])
+			elif type(self.info['pre_username']) == list:
+				for command in list:
+					self.send(command)
 		if self.info['username_command']:
 			send(self.info['username_command'] %(self.credentials))
-		
+		else: # No specific command for the username
+			# Just send the username
+			self.send(self.credentials['username'])
 	
 	def exit(self, reason, code=1):
 		"""Centralized exiting function"""
