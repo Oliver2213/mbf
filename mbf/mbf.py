@@ -30,4 +30,33 @@ class Mbf(object):
 			autoconnect: automatically connect to the mud using hostname and port upon instance instantiation. This *does not* automatically log you in. Set this to false if you want to connect manually by calling connect().
 			autologin: Automatically log in after connecting. Requires that username and password are set and that manage_login is True, will do nothing otherwise. Set this to false if you want to manually login by running login().
 		"""
+		self.hostname = hostname
+		self.info = info
+		self.credentials={}
+		self.credentials['username'] = username
+		self.credentials['password'] = password
+		self.port = port
+		self.manage_login = manage_login
+		self.autoconnect = autoconnect
+		self.autologin = autologin
+		self.reconnect = reconnect
 		
+		# self.connected is a boolean that indicates whether this instance of mbf is currently connected to a mud.
+		At first, this is set to false, but connect() sets this to the telnet object's 'eof'
+		self.connected = False
+		if self.autoconnect:
+			self.connect()
+
+	def connect(self):
+		"""Method to connect to the provided host using the provided port. Method is ran automatically at class instantiation if autoconnect is set to true"""
+		self.tn = telnetlib.Telnet(self.hostname, self.port)
+		self.connected = self.tn.eof
+	
+	def disconnect(self):
+		"""Close the telnet connection"""
+		self.tn.close()
+	
+	def send(self, msg, prefix = "", suffix = '\n'):
+		"""'write' to the telnet connection, with the provided prefix and suffix"""
+		self.tn.write(suffix+msg+prefix)
+	
