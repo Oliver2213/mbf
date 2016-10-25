@@ -27,6 +27,7 @@ class Mbf(object):
 			Username: The username of your mud. You don't *have* to provide this here, but it will let mbf reconnect. If you for some reason don't want to provide this here, you can always use write() to send it manually yourself.
 			Password: your mud account's password. As with username, you don't have to specify it here, but it helps if you want mbf to reconnect you and manage your logins.
 			manage_login: Should the framework worry about managing the login sequence? If set to true, the framework will use the values in the info dictionary to handle logging into the mud. Values like 'prompt_username', 'username_command', 'prompt_password', and 'password_command' are some of the values that the framework will use to correctly log in. If this is set to false, the user will need to make their own triggers for dealing with this. This is set to true by default.
-			autoconnect: automatically connect to the mud using hostname and port upon instance instantiation. This *does not* automatically log you in.
-			autologin: Automatically log in after connecting. Requires that username and password are set and that manage_login is True, will do nothing otherwise.
+			autoconnect: automatically connect to the mud using hostname and port upon instance instantiation. This *does not* automatically log you in. Set this to false if you want to connect manually by calling connect().
+			autologin: Automatically log in after connecting. Requires that username and password are set and that manage_login is True, will do nothing otherwise. Set this to false if you want to manually login by running login().
 		"""
+		
