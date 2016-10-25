@@ -3,6 +3,7 @@
 
 import re
 import telnetlib
+import sys
 
 
 class Mbf(object):
@@ -67,3 +68,23 @@ class Mbf(object):
 		"""'write' to the telnet connection, with the provided prefix and suffix"""
 		self.tn.write(suffix+msg+prefix)
 	
+	self.read_until = self.tn.read_until
+	
+	def login(self):
+		"""Manage logging into a mud"""
+		if 'username_prompt' in self.info.itervalues() == False:
+			self.exit("Auto login failed, no username prompt string provided.")
+		self.read_until(self.info['username_prompt'])
+		if self.info['pre_username']:
+			self.send(self.info['pre_username'])
+		if self.info['username_command']:
+			send(self.info['username_command'] %(self.credentials))
+		
+	
+	def exit(self, reason, code=1):
+		"""Centralized exiting function"""
+		print(reason)
+		print("Exiting.")
+		if self.connected:
+			self.disconnect()
+		sys.exit(code)
