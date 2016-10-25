@@ -65,8 +65,12 @@ class Mbf(object):
 		self.tn.close()
 	
 	def send(self, msg, prefix = "", suffix = '\n'):
-		"""'write' to the telnet connection, with the provided prefix and suffix"""
-		self.tn.write(suffix+msg+prefix)
+		"""'write' to the telnet connection, with the provided prefix and suffix. The provided type can be either a string (in which case it will be sent directly), or a list of strings (which will be iterated over and sent, in the order which the items were added."""
+		if type(msg) == str:
+			self.tn.write(prefix+msg+suffix)
+		elif type(msg) == list:
+			for command in list:
+				self.tn.write(prefix+command+suffix)
 	
 	self.read_until = self.tn.read_until
 	
@@ -76,11 +80,7 @@ class Mbf(object):
 			self.exit("Auto login failed, no username prompt string provided.")
 		self.read_until(self.info['username_prompt'])
 		if self.info['pre_username']:
-			if type(self.info['pre_username']) == str:
-				self.send(self.info['pre_username'])
-			elif type(self.info['pre_username']) == list:
-				for command in list:
-					self.send(command)
+			self.send(self.info['pre_username'])
 		if self.info['username_command']:
 			send(self.info['username_command'] %(self.credentials))
 		else: # No specific command for the username
