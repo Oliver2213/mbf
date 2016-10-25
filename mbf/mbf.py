@@ -32,25 +32,32 @@ class Mbf(object):
 		"""
 		self.hostname = hostname
 		self.info = info
-		self.credentials={}
-		self.credentials['username'] = username
-		self.credentials['password'] = password
 		self.port = port
 		self.manage_login = manage_login
 		self.autoconnect = autoconnect
 		self.autologin = autologin
 		self.reconnect = reconnect
 		
+		if username and password:
+			self.credentials={}
+			self.credentials['username'] = username
+			self.credentials['password'] = password
+		else: # we don't know username or password
+			if self.autologin:
+				self.autologin = False # we can't manage logins
+		
 		# self.connected is a boolean that indicates whether this instance of mbf is currently connected to a mud.
 		# At first, this is set to false, but connect() sets this to the telnet object's 'eof'
 		self.connected = False
 		if self.autoconnect:
 			self.connect()
-
+	
 	def connect(self):
-		"""Method to connect to the provided host using the provided port. Method is ran automatically at class instantiation if autoconnect is set to true"""
+		"""Method to connect to the provided host using the provided port. Method is ran automatically at class instantiation if autoconnect is set to true; also handles auto logins if that option is enabled"""
 		self.tn = telnetlib.Telnet(self.hostname, self.port)
 		self.connected = self.tn.eof
+		if self.autologin:
+			# self.login()
 	
 	def disconnect(self):
 		"""Close the telnet connection"""
