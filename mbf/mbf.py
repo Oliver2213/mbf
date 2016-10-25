@@ -42,7 +42,7 @@ class Mbf(object):
 		self.reconnect = reconnect
 		
 		# self.connected is a boolean that indicates whether this instance of mbf is currently connected to a mud.
-		At first, this is set to false, but connect() sets this to the telnet object's 'eof'
+		# At first, this is set to false, but connect() sets this to the telnet object's 'eof'
 		self.connected = False
 		if self.autoconnect:
 			self.connect()
