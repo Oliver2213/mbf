@@ -23,6 +23,7 @@ class Mbf(object):
 				password_wrong: If your mud sends a string to let you know your password is incorrect (which it almost certainly does), set this here so that the framework can exit. This should be a regular expression, either a compiled object or a string.
 				password_command: If your mud requires a command other than the password itself, set that here. For example, on a mud that requires you to send the word password before your password, you would set this to: "password %(password)s". If this and 'password_prompt' are set to none or are left out, the framework will not send any password, assuming that the password was sent by the username command. Unlike username_command, mbf will *not* automatically send the password on it's own. If you need to send the password on it's own, you must explicitly set this to "%(password)s". Lets say password some more: password password password this better not be your password.
 				post_password: If your mud has any kind of menu system or you just want to run a command after sending your password, you can use this item to specify command(s) you want the framework to send. This can either be a string, a list, or none / left out. If a list is provided, items will be sent sequentially as they were added to the list. If 'password_command' and 'password_prompt' are not set or are none, these commands will not be sent. Also, if the password_wrong regexp is matched, these commands will not be sent.
+				password_correct: If your mud sends any kind of welcome string when you correctly enter your password (which it probably does), set this item. This needs to be a regular expression, and this message should be sent *only* if the login is successful. If this is left out or is set to none, (and 'password_wrong' is provided), then after sending 'password_command' if 'password_wrong' isn't received the login is assumed to be successful and trigger processing begins. If this is set, post_password commands get sent after receiving this.
 
 			port: port for your mud, defaults to 23 for what I hope are also obvious reasons.
 			Username: The username of your mud. You don't *have* to provide this here, but it will let mbf reconnect. If you for some reason don't want to provide this here, you can always use write() to send it manually yourself.
@@ -91,18 +92,35 @@ class Mbf(object):
 		else: # No specific command for the username
 			# Just send the username on it's own
 			self.send(self.credentials['username'])
-		if self.info['post_username']:
-			self.send(self.info['post_username'])
-		if self.info['password_prompt'] and self.info['password_command']: # if we have a password prompt and command
-			# Now handle either a password prompt or an incorrect username
-			# But first, run pre_password commands if any:
+		
+		l = [self.info['username_wrong']] # List of match regexps we're waiting for from the mud
+		if self.info['password_prompt']:
+			l.append(self.info['password_prompt']) # We have a password prompt regexp, so we add it to the expected list of regexps
+		r = self.expect(l)
+		if l[r[0]] != self.info['username_wrong']: # if the matching regexp is not password_wrong
+			if self.info['post_username']:
+				self.send(self.info['post_username'])
+		else: # incorrect username
+			self.exit("Incorrect username.")
+		
+		if self.info['password_prompt'] and self.info['password_command'] and l[r[0]] == self.info['password_prompt']: # if we have a password prompt and command and the password prompt regexp matched
+			# First, run pre_password commands if any:
 			if self.info['pre_password']:
 				self.send(self.info['pre_password'])
-			self.l = [self.info['password_prompt'], self.info['username_wrong']] # List of match regexps we're waiting for from the mud
-			self.r = self.expect(self.l)
-			if self.l[self.r[0]] == self.info['password_prompt']: # if the index of the matching list item is the 'password_prompt' value
-				# The mud is requesting a password, because our password_prompt regexp matched
-				self.send(self.info['password_command'] %(self.credentials)) # Send the password command
+			# The mud is requesting a password, because our password_prompt regexp matched
+			self.send(self.info['password_command'] %(self.credentials)) # Send the password command
+			l = [self.info['password_wrong']]
+			if self.info['password_correct']:
+				l.append(self.info['password_correct']) # add the correct password string to the expected list of matches
+			r = self.expect(l)
+			if self.info['password_correct'] and l[r[0]] == self.info['password_correct']: # the password_correct regexp exists and matches
+				# Login successful
+				# do successful things here
+			elif l[r[0]] != self.info['password_wrong']: # the password isn't incorrect, and we don't know what a successful password attempt looks like, so let's assume things worked
+				# login assumed
+				# do successful things here
+			elif l[r[0]] == self.info['password_wrong']: # incorrect password regexp matched
+				self.exit("Incorrect password.")
 	
 	def exit(self, reason, code=1):
 		"""Centralized exiting function"""
