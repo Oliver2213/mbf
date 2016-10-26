@@ -64,7 +64,7 @@ class Mbf(object):
 		self.read_very_eager = self.tn.read_very_eager
 		self.expect = self.tn.expect
 		if self.autologin:
-			# self.login()
+			self.login()
 	
 	def disconnect(self):
 		"""Close the telnet connection"""
@@ -116,9 +116,11 @@ class Mbf(object):
 			if self.info['password_correct'] and l[r[0]] == self.info['password_correct']: # the password_correct regexp exists and matches
 				# Login successful
 				# do successful things here
+				pass
 			elif l[r[0]] != self.info['password_wrong']: # the password isn't incorrect, and we don't know what a successful password attempt looks like, so let's assume things worked
 				# login assumed
 				# do successful things here
+				pass
 			elif l[r[0]] == self.info['password_wrong']: # incorrect password regexp matched
 				self.exit("Incorrect password.")
 	
