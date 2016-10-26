@@ -17,12 +17,12 @@ class Mbf(object):
 				username_prompt: The string your mud sends when it's asking for your account's username. This should be a regular expression, either a compiled object or a string.
 				username_wrong: If your mud sends a string informing you that you entered an incorrect username, set that as this item's value so mbf can exit. This should be a regular expression, either a compiled object or a string.
 				username_command: The string to send your username to the mud. This isn't limited to just the username; If your mud requires you to connect like: connect username password, then a matching value for this item would be: "connect %(username)s %(password)s". If this is left out or is set to none, the username on it's own will be sent.
-				post_username: Any commands that should be sent to your mud after sennding the username. Either a string, or a list of strings is acceptable; strings in a list will be sent in the order in which they were added to the list. This can safely be left out of your info dict if you don't need it, or set to none.
-				pre_password: If you need to send any commands before entering a password, they will go here. This item can be either a string or a list. If a list, strings in the list will be sent sequentially in the order that they were added to the list. This item can safely be left out of your info dict if you don't need it, or set to none.
+				post_username: Any commands that should be sent to your mud after sennding the username. Either a string, or a list of strings is acceptable; strings in a list will be sent in the order in which they were added to the list. This can safely be left out of your info dict if you don't need it, or set to none. If 'username_command' sends your password as well (and therefore 'password_command' and 'password_prompt' are not set or are none), you should use this item to navigate any menus or screens your mud presents before actually logging you in. These commands will not be sent if the username is incorrect.
+				pre_password: If you need to send any commands before entering a password, they will go here. This item can be either a string or a list. If a list, strings in the list will be sent sequentially in the order that they were added to the list. This item can safely be left out of your info dict if you don't need it, or set to none. If 'password_command' and 'password_prompt' are not set or are none, these commands will not be sent.
 				password_prompt: A string that your mud sends to prompt you for your password. In some cases, it might just be "password:", and on some muds that require you to connect with "connect user password", this can be safely left out or set to none. This should be a regular expression, either a compiled object or a string. If this and 'password_command' are set to none or are left out, the framework will not send any password, assuming that the password was sent by the username command.
 				password_wrong: If your mud sends a string to let you know your password is incorrect (which it almost certainly does), set this here so that the framework can exit. This should be a regular expression, either a compiled object or a string.
-				password_command: If your mud requires a command other than the password itself, set that here. For example, on a mud that requires you to send the word password before your password, you would set this to: "password %(password)s". If this and 'password_prompt' are set to none or are left out, the framework will not send any password, assuming that the password was sent by the username command. Lets say password some more: password password password this better not be your password.
-				post_password: If your mud has any kind of menu system or you just want to run a command after sending your password, you can use this item to specify command(s) you want the framework to send. This can either be a string, a list, or none / left out. If a list is provided, items will be sent sequentially as they were added to the list.
+				password_command: If your mud requires a command other than the password itself, set that here. For example, on a mud that requires you to send the word password before your password, you would set this to: "password %(password)s". If this and 'password_prompt' are set to none or are left out, the framework will not send any password, assuming that the password was sent by the username command. Unlike username_command, mbf will *not* automatically send the password on it's own. If you need to send the password on it's own, you must explicitly set this to "%(password)s". Lets say password some more: password password password this better not be your password.
+				post_password: If your mud has any kind of menu system or you just want to run a command after sending your password, you can use this item to specify command(s) you want the framework to send. This can either be a string, a list, or none / left out. If a list is provided, items will be sent sequentially as they were added to the list. If 'password_command' and 'password_prompt' are not set or are none, these commands will not be sent. Also, if the password_wrong regexp is matched, these commands will not be sent.
 
 			port: port for your mud, defaults to 23 for what I hope are also obvious reasons.
 			Username: The username of your mud. You don't *have* to provide this here, but it will let mbf reconnect. If you for some reason don't want to provide this here, you can always use write() to send it manually yourself.
@@ -91,8 +91,18 @@ class Mbf(object):
 		else: # No specific command for the username
 			# Just send the username on it's own
 			self.send(self.credentials['username'])
-		# Now handle either a password prompt or an incorrect username:
-		self.expect([self.info['password_prompt'], self.info['username_wrong']])
+		if self.info['post_username']:
+			self.send(self.info['post_username'])
+		if self.info['password_prompt'] and self.info['password_command']: # if we have a password prompt and command
+			# Now handle either a password prompt or an incorrect username
+			# But first, run pre_password commands if any:
+			if self.info['pre_password']:
+				self.send(self.info['pre_password'])
+			self.l = [self.info['password_prompt'], self.info['username_wrong']] # List of match regexps we're waiting for from the mud
+			self.r = self.expect(self.l)
+			if self.l[self.r[0]] == self.info['password_prompt']: # if the index of the matching list item is the 'password_prompt' value
+				# The mud is requesting a password, because our password_prompt regexp matched
+				self.send(self.info['password_command'] %(self.credentials)) # Send the password command
 	
 	def exit(self, reason, code=1):
 		"""Centralized exiting function"""
