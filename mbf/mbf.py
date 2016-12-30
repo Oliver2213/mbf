@@ -43,7 +43,7 @@ class Mbf(object):
 		self.reconnect = reconnect
 		
 		if username and password:
-			self.credentials={}
+			self.credentials={} # Create a credentials dict so later these values can be used in login command strings
 			self.credentials['username'] = username
 			self.credentials['password'] = password
 		else: # we don't know username or password
@@ -66,7 +66,7 @@ class Mbf(object):
 		self.read_very_eager = self.tn.read_very_eager
 		self.expect = self.tn.expect
 		if self.autologin:
-			self.login()
+			self.login() # Start our autologin sequence
 	
 	def disconnect(self):
 		"""Close the telnet connection"""
@@ -84,18 +84,20 @@ class Mbf(object):
 	def login(self):
 		"""Manage logging into a mud"""
 		if 'username_prompt' in self.info.itervalues() == False:
-			self.exit("Auto login failed, no username prompt string provided.")
+			self.exit("Auto login failed, no username prompt provided. Please add this to your info dictionary passed to the framework's constructor")
+		# We should be connected
+		if self.info['pre_username']: # if we have commands to send before sending username_command
+			self.send(self.info['pre_username']) # send them
 		# We use telnetlib's 'read_until' because we want the call to block, in case the mud is slow
 		self.read_until(self.info['username_prompt'])
-		if self.info['pre_username']:
-			self.send(self.info['pre_username'])
 		if self.info['username_command']:
+			# Send the username command, providing the credentials dict so the user has access to username and password values
 			send(self.info['username_command'] %(self.credentials))
 		else: # No specific command for the username
 			# Just send the username on it's own
 			self.send(self.credentials['username'])
 		
-		l = [self.info['username_wrong']] # List of match regexps we're waiting for from the mud
+		l = [self.info['username_wrong']] # List of regexps we think might match
 		if self.info['password_prompt']:
 			l.append(self.info['password_prompt']) # We have a password prompt regexp, so we add it to the expected list of regexps
 		r = self.expect(l)
@@ -111,18 +113,19 @@ class Mbf(object):
 				self.send(self.info['pre_password'])
 			# The mud is requesting a password, because our password_prompt regexp matched
 			self.send(self.info['password_command'] %(self.credentials)) # Send the password command
-			l = [self.info['password_wrong']]
+			l = [self.info['password_wrong']] # again, list of regexp(s) we expect to match
 			if self.info['password_correct']:
-				l.append(self.info['password_correct']) # add the correct password string to the expected list of matches
+				l.append(self.info['password_correct']) # add the correct password regexp to the expected list of matches
 			r = self.expect(l)
 			if self.info['password_correct'] and l[r[0]] == self.info['password_correct']: # the password_correct regexp exists and matches
 				# Login successful
 				# do successful things here
-				pass
-			elif l[r[0]] != self.info['password_wrong']: # the password isn't incorrect, and we don't know what a successful password attempt looks like, so let's assume things worked
+				self.logged_in = True
+				return True # Our work is done
+			elif l[r[0]] != self.info['password_wrong']: # the password is incorrect, and we don't know what a successful password attempt looks like, so let's assume things worked
 				# login assumed
 				# do successful things here
-				pass
+				return True
 			elif l[r[0]] == self.info['password_wrong']: # incorrect password regexp matched
 				self.exit("Incorrect password.")
 	
