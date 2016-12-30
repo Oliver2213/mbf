@@ -5,6 +5,8 @@ import re
 import telnetlib
 import sys
 
+from trigger import Trigger
+
 
 class Mbf(object):
 	
