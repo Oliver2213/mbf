@@ -6,7 +6,7 @@ import re
 
 
 class Trigger(object):
-	def __init__(trig, case_sensitive=True, name=None, enabled=True, stop_processing=False, sequence=100):
+	def __init__(self, trig, is_regexp=True, case_sensitive=True, name=None, enabled=True, stop_processing=False, sequence=100):
 		"""This class represents a trigger and it's metadata;
 			It does not store code, as it's intended that a function in mbf will "decorate" user functions with a trigger class,
 		Arguments:
@@ -31,3 +31,15 @@ class Trigger(object):
 		
 		pass # for now
 	
+	def add_function(f):
+		"""Add a function to an instance of this class; this function will be what gets run when this trigger matches"""
+		self.fn = f
+	
+	# Comparison methods, so that sort() will properly sort on sequence
+
+	__eq__ = lambda self, other: self.sequence == other.sequence
+	__ne__ = lambda self, other: self.sequence != other.sequence
+	__lt__ = lambda self, other: self.sequence < other.sequence
+	__le__ = lambda self, other: self.sequence <= other.sequence
+	__gt__ = lambda self, other: self.sequence > other.sequence
+	__ge__ = lambda self, other: self.sequence >= other.sequence

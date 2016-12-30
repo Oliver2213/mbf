@@ -136,3 +136,17 @@ class Mbf(object):
 		if self.connected:
 			self.disconnect()
 		sys.exit(code)
+	
+	def trigger(self, *args, **kwargs):
+		def decorator(trigger_function):
+			"""Returns a wrapper that associates a trigger class instance with a function
+The wrapper itself is literally a function that calls the function decorated"""
+			def wrapper(self, line, match):
+				return trigger_function(line, match) # call the original trigger function
+			# Create an instance of the 'Trigger' class
+			new_trigger = Trigger(*args, **kwargs)  # profide all wrapper arguments to this 'trigger' instance
+			new_trigger.add_function(wrapper) # Add the wrapper function 
+			# add the trigger to an internal list
+			self.triggers.append(new_trigger)
+			return wrapper
+		return decorator
