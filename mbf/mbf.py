@@ -6,6 +6,7 @@ import telnetlib
 import sys
 
 from trigger import Trigger
+from utils import match_regexp_list, process_info_dict
 
 
 class Mbf(object):
@@ -14,7 +15,8 @@ class Mbf(object):
 		"""Constructor for the main Mbf class
 		Args:
 			hostname: the hostname of your mud; this isn't optional for obvious reasons.
-			info: info should be a dictionary with values specific to your mud. Acceptable keys are below:
+			info: info should be a dictionary with values specific to your mud. Items that end in '_prompt', '_wrong', and '_correct' must be regular expressions; if you provide strings they will be automatically compiled into regular expression objects.
+			Acceptable keys are below:
 				pre_username: Any commands mbf should send to your mud before it can send a username. This can be either none, a string, or a list (in the last case, the commands will be executed sequentially in the order they were added to the list).
 				username_prompt: The string your mud sends when it's asking for your account's username. This should be a regular expression, either a compiled object or a string.
 				username_wrong: If your mud sends a string informing you that you entered an incorrect username, set that as this item's value so mbf can exit. This should be a regular expression, either a compiled object or a string.
@@ -32,10 +34,10 @@ class Mbf(object):
 			Password: your mud account's password. As with username, you don't have to specify it here, but it helps if you want mbf to reconnect you and manage your logins.
 			manage_login: Should the framework worry about managing the login sequence? If set to true, the framework will use the values in the info dictionary to handle logging into the mud. Values like 'prompt_username', 'username_command', 'prompt_password', and 'password_command' are some of the values that the framework will use to correctly log in. If this is set to false, the user will need to make their own triggers for dealing with this. This is set to true by default.
 			autoconnect: automatically connect to the mud using hostname and port upon instance instantiation. This *does not* automatically log you in. Set this to false if you want to connect manually by calling connect().
-			autologin: Automatically log in after connecting. Requires that username and password are set and that manage_login is True, will do nothing otherwise. Set this to false if you want to manually login by running login().
+			autologin: Automatically log in after connecting. Requires that username and password are set, that appropriate values are set in the info dict, and that manage_login is True, will do nothing otherwise. Set this to false if you want to manually login by running login(). Note that login() has the same requirements, minus, of course, that this boolean be set to True.
 		"""
 		self.hostname = hostname
-		self.info = info
+		self.info = process_info_dict(info)
 		self.port = port
 		self.manage_login = manage_login
 		self.autoconnect = autoconnect
