@@ -147,9 +147,11 @@ class Mbf(object):
 		while running:
 			buff = self.read_very_eager()
 			for t in self.triggers:
+				# Quickly check if there is at least one match for this trigger in the buffer
 				if t.matches(buff):
-				# todo: create and call extract matches function
-				t.fn(buff, )
+					# Find all matches of this trigger in the buffer
+					
+					t.fn(buff, m)
 	
 	def trigger(self, *t_args, **t_kwargs):
 		"""Method that returns a decorator to automatically set up a trigger and associate it with a function to run when the trigger is matched

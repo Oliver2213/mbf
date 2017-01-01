@@ -31,6 +31,9 @@ class Trigger(object):
 		self.stop_processing = stop_processing
 		if self.is_regexp:
 			self.trig = re.compile(self.trig) # compile into a re pattern object
+			self.mode = 0  #flags for the re
+			if self.case_sensitive == False:
+				mode += re.IGNORECASE
 		else:
 			self.trig = self.trig.lower()
 	
@@ -46,11 +49,12 @@ class Trigger(object):
 	
 	def matches(self, string):
 		"""Determine if this    trigger instance matches string; return true if so, false if otherwise.
+		This is meant for quick evaluation of a trigger, without running findall on a potentially large block of text, extracting all of the (potentially many) re matches for regular expression triggers.
 		Note that this doesn't return how many times the specific trigger matches against the given string; just that it *does* match at some point, at least once.
 		This method also properly handles triggers that are regular expressions and ones that are plaintext
 		"""
 		if self.is_regexp:
-			if sself.trig.search(string):
+			if sself.trig.search(string, flags=self.mode):
 				return True
 			else: # No matches for this regexp trigger on given string
 				return False
