@@ -152,7 +152,9 @@ class Mbf(object):
 					if t.matches(buff):
 						# Find all matches of this trigger in the buffer and call the associated function for each one
 						# Basically, "fire" this trigger
-						t.fire(buff)
+						stop = t.fire(buff)
+						if stop: # if the trigger function returned true or the trigger has stop_processing set
+							break # Don't do any more trigger processing for this buffer of data
 	
 	def trigger(self, *t_args, **t_kwargs):
 		"""Method that returns a decorator to automatically set up a trigger and associate it with a function to run when the trigger is matched

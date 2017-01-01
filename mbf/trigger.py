@@ -84,7 +84,7 @@ class Trigger(object):
 			# line by line text matching iteration
 			for l in lines:
 				if self.trig in l:
-					self.fn(string, None) # call associated function
+					return self.fn(string, None) # call associated function and return it's value
 	
 	# Comparison methods, so that sort() will properly sort on sequence
 
