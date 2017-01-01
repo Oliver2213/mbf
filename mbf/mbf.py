@@ -149,9 +149,9 @@ class Mbf(object):
 			for t in self.triggers:
 				# Quickly check if there is at least one match for this trigger in the buffer
 				if t.matches(buff):
-					# Find all matches of this trigger in the buffer
-					
-					t.fn(buff, m)
+					# Find all matches of this trigger in the buffer and call the associated function for each one
+					# Basically, "fire" this trigger
+					t.fire(buff)
 	
 	def trigger(self, *t_args, **t_kwargs):
 		"""Method that returns a decorator to automatically set up a trigger and associate it with a function to run when the trigger is matched

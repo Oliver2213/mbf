@@ -52,6 +52,8 @@ class Trigger(object):
 		This is meant for quick evaluation of a trigger, without running findall on a potentially large block of text, extracting all of the (potentially many) re matches for regular expression triggers.
 		Note that this doesn't return how many times the specific trigger matches against the given string; just that it *does* match at some point, at least once.
 		This method also properly handles triggers that are regular expressions and ones that are plaintext
+		Args:
+			string - a string to look in to see if this trigger matches at least once
 		"""
 		if self.is_regexp:
 			if sself.trig.search(string, flags=self.mode):
@@ -63,6 +65,26 @@ class Trigger(object):
 				return True
 			else: # text trigger string not found in given data
 				return False
+	
+	def fire(self, string):
+		"""Fires this trigger by running the function associated with it.
+		This properly handles regexp and plain-text triggers, calling the associated function for every match in string.
+		It is assumed that 'matches' has been called and has returned true; otherwise running this is a waist
+		Args:
+			string - a string of text to look for matches in.
+		"""
+		if self.is_regexp:
+			for m in self.trig.finditer(string, flags=self.mode):
+				self.fn(string, m) # call the trigger's function
+		elif self.regexp == False:
+			# Ugh, plain-text triggers
+			string = string.lower()
+			# split string by lines
+			lines = string.split('\n')
+			# line by line text matching iteration
+			for l in lines:
+				if self.trig in l:
+					self.fn(string, None) # call associated function
 	
 	# Comparison methods, so that sort() will properly sort on sequence
 
