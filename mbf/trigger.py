@@ -28,12 +28,37 @@ class Trigger(object):
 		self.name = name
 		self.enabled = enabled
 		self.sequence = sequence
-		
-		pass # for now
+		self.stop_processing = stop_processing
+		if self.is_regexp:
+			self.trig = re.compile(self.trig) # compile into a re pattern object
+		else:
+			self.trig = self.trig.lower()
 	
 	def add_function(f):
-		"""Add a function to an instance of this class; this function will be what gets run when this trigger matches"""
+		"""Add a function to an instance of this class; this function will be what gets run when this trigger matches
+		It's signature should be as follows:
+			text - the block of text that this trigger found a match in.
+				This won't always be one line, and may in fact be a large chunk of text; triggers using regular expressions will have a much easier time of parsing their line(s) from this data.
+			match - If the trigger uses a regular expression, this will be it's corresponding match object. If the trigger is a plaintext string, this will be none.
+				With this you can extract named (and unnamed) variables, split the string, and use any normal 're' match object methods.
+		"""
 		self.fn = f
+	
+	def matches(self, string):
+		"""Determine if this    trigger instance matches string; return true if so, false if otherwise.
+		Note that this doesn't return how many times the specific trigger matches against the given string; just that it *does* match at some point, at least once.
+		This method also properly handles triggers that are regular expressions and ones that are plaintext
+		"""
+		if self.is_regexp:
+			if sself.trig.search(string):
+				return True
+			else: # No matches for this regexp trigger on given string
+				return False
+		elif self.is_regexp == False:
+			if self.trig in string:
+				return True
+			else: # text trigger string not found in given data
+				return False
 	
 	# Comparison methods, so that sort() will properly sort on sequence
 

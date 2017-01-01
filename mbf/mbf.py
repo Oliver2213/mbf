@@ -139,15 +139,38 @@ class Mbf(object):
 			self.disconnect()
 		sys.exit(code)
 	
-	def trigger(self, *args, **kwargs):
+	def process_triggers(self):
+		"""Begin trigger processing
+		"""
+		self.triggers.sort() # put the trigger list in order of sequence
+		self.running = True
+		for t in self.triggers:
+			buff = self.read_very_eager()
+			if t.matches(buff):
+				# todo: create and call extract matches function
+				t.fn(buff, )
+	
+	def trigger(self, *t_args, **t_kwargs):
+		"""Method that returns a decorator to automatically set up a trigger and associate it with a function to run when the trigger is matched
+		Code in this function gets executed immediately, not when the associated function runs.
+		It dynamically accepts arguments and passes them off to a 'Trigger' class instance
+		"""
+		# This would be the logical place to create the trigger object
+		# but we can't because the next function is the one that accepts the trigger function as it's argument
+		# And we need to be able to tell the trigger object what it's associated function is
 		def decorator(trigger_function):
-			"""Returns a wrapper that associates a trigger class instance with a function
-The wrapper itself is literally a function that calls the function decorated"""
-			def wrapper(self, line, match):
-				return trigger_function(line, match) # call the original trigger function
+			"""This takes the trigger's associated function as the only argument
+			It defines the decorator and wrapper, as well as setting up the 'Trigger' object and associating it with the decorated function.
+			"""
+			def wrapper(self, *args, **kwargs):
+				"""This function is what will be called in place of the decorated function;
+				It takes the arguments given to it and passes them on.
+				It needs to run said function and return what it does
+				"""
+				return trigger_function(*args, **kwargs) # call the original trigger function
 			# Create an instance of the 'Trigger' class
-			new_trigger = Trigger(*args, **kwargs)  # profide all wrapper arguments to this 'trigger' instance
-			new_trigger.add_function(wrapper) # Add the wrapper function 
+			new_trigger = Trigger(*t_args, **t_kwargs)  # provide all wrapper arguments to this 'trigger' instance
+			new_trigger.add_function(wrapper) # Associate the wrapper with the trigger object
 			# add the trigger to an internal list
 			self.triggers.append(new_trigger)
 			return wrapper
