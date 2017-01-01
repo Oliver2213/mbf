@@ -144,8 +144,9 @@ class Mbf(object):
 		"""
 		self.triggers.sort() # put the trigger list in order of sequence
 		self.running = True
+		while running:
+		buff = self.read_very_eager()
 		for t in self.triggers:
-			buff = self.read_very_eager()
 			if t.matches(buff):
 				# todo: create and call extract matches function
 				t.fn(buff, )
