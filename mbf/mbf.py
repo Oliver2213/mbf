@@ -45,6 +45,7 @@ class Mbf(object):
 		self.auto_login = auto_login
 		self.reconnect = reconnect
 		self.timeout = timeout
+		self.triggers = []
 		
 		if username and password:
 			self.credentials={} # Create a credentials dict so later these values can be used in login command strings
@@ -149,7 +150,7 @@ class Mbf(object):
 		"""
 		self.triggers.sort() # put the trigger list in order of sequence
 		self.running = True
-		while running:
+		while self.running:
 			buff = self.read_very_eager()
 			for t in self.triggers :
 				if t.enabled: # Iff this trigger is enabled
@@ -177,7 +178,7 @@ class Mbf(object):
 				t_kwargs['name'] = trigger_function.__name__
 			# Create an instance of the 'Trigger' class
 			new_trigger = Trigger(*t_args, **t_kwargs)  # provide all wrapper arguments to this 'trigger' instance
-			def wrapper(self, *args, **kwargs):
+			def wrapper(*args, **kwargs):
 				"""This function is what will be called in place of the decorated function;
 				It takes the arguments given to it and passes them on.
 				It needs to run said function and return what it does or (if it doesn't return anything), return the value of the stop_processing flag in the trigger class

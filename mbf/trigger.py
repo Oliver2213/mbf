@@ -33,16 +33,17 @@ class Trigger(object):
 		self.sequence = sequence
 		self.stop_processing = stop_processing
 		if self.is_regexp:
-			self.trig = re.compile(self.trig) # compile into a re pattern object
 			self.mode = 0  #flags for the re
 			if self.case_sensitive == False:
 				mode += re.IGNORECASE
 			if self.multiline:
-				mode += re.MULTILINE|re.DOTALL
+				self.mode += re.MULTILINE|re.DOTALL
+			# After setting modes, compile the re pattern object with them
+			self.trig = re.compile(self.trig, flags=self.mode) # compile into a re pattern object
 		else:
 			self.trig = self.trig.lower()
 	
-	def add_function(f):
+	def add_function(self, f):
 		"""Add a function to an instance of this class; this function will be what gets run when this trigger matches
 		It's signature should be as follows:
 			text - The text that this trigger found a match in.
@@ -63,7 +64,7 @@ class Trigger(object):
 			string - a string to look in to see if this trigger matches at least once
 		"""
 		if self.is_regexp:
-			if sself.trig.search(string, flags=self.mode):
+			if self.trig.search(string):
 				return True
 			else: # No matches for this regexp trigger on given string
 				return False
@@ -83,11 +84,11 @@ class Trigger(object):
 		if self.is_regexp:
 			if self.multiline == False: # split string up into lines
 				for l in string.split("\r\n"): # And feed them to finditer
-					for m in self.trig.finditer(l, flags=self.mode):	
+					for m in self.trig.finditer(l):	
 						self.fn(l, m) # call the trigger's function
 			elif self.multiline: # multiline trig
 				# We can feed each trigger the hole block
-				for m in self.trig.finditer(string, flags=self.mode): # for every occurrence of this trigger in given block of text
+				for m in self.trig.finditer(string): # for every occurrence of this trigger in given block of text
 					self.fn(string, m) # call the trigger's function
 		elif self.regexp == False:
 			# Ugh, plain-text triggers
