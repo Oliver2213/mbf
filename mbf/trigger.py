@@ -6,7 +6,7 @@ import re
 
 
 class Trigger(object):
-	def __init__(self, trig, is_regexp=True, case_sensitive=True, name=None, group='all', enabled=True, stop_processing=False, sequence=100):
+	def __init__(self, trig, is_regexp=True, case_sensitive=True, multiline=False, name=None, group='all', enabled=True, stop_processing=False, sequence=100):
 		"""This class represents a trigger and it's metadata;
 			It does not store code, as it's intended that a function in mbf will "decorate" user functions with a trigger class,
 		Arguments:
@@ -14,6 +14,7 @@ class Trigger(object):
 			is_regexp: A boolean that specifies if the trigger argument is a regular expression (and if it's a string it will be compiled), or just a plain text string (which will be left alone and matched literally)
 			case_sensitive: A bool, true by default, that specifies if the trigger will match characters in exact case.
 				When this is false, regular expressions have the 'IGNORECASE' mode set; for strings, the trig value is 'lower()'-ed on instantiation, the incoming line is 'lower()'-ed as well and then processed.
+			multiline: If this trigger should match on multiple lines.
 			name: A string (none by default) that is the human readable name for the trigger.
 				The name is set by default by mbf's 'trigger' method which wrapps the trigger's code; unless set otherwise it will become the name of the trigger's function.
 			enabled: A boolean that determines if this trigger will be considered when matching lines.
@@ -25,6 +26,7 @@ class Trigger(object):
 		self.trig = trig
 		self.is_regexp = is_regexp
 		self.case_sensitive = case_sensitive
+		self.multiline = multiline
 		self.name = name
 		self.group = group
 		self.enabled = enabled
@@ -35,14 +37,18 @@ class Trigger(object):
 			self.mode = 0  #flags for the re
 			if self.case_sensitive == False:
 				mode += re.IGNORECASE
+			if self.multiline:
+				mode += re.MULTILINE|re.DOTALL
 		else:
 			self.trig = self.trig.lower()
 	
 	def add_function(f):
 		"""Add a function to an instance of this class; this function will be what gets run when this trigger matches
 		It's signature should be as follows:
-			text - the block of text that this trigger found a match in.
-				This won't always be one line, and may in fact be a large chunk of text; triggers using regular expressions will have a much easier time of parsing their line(s) from this data.
+			text - The text that this trigger found a match in.
+				For multiline triggers, this is the entire block of text that was pulled from the socket and passed to fire.
+				For single line triggers, whether regexp or plaintext, this will be the single line that it matched in.
+				If your trigger is multiline, this may be a large chunk of text; triggers using regular expressions will have a much easier time of parsing their line(s) from this data.
 			match - If the trigger uses a regular expression, this will be it's corresponding match object. If the trigger is a plaintext string, this will be none.
 				With this you can extract named (and unnamed) variables, split the string, and use any normal 're' match object methods.
 		"""
@@ -69,14 +75,20 @@ class Trigger(object):
 	
 	def fire(self, string):
 		"""Fires this trigger by running the function associated with it.
-		This properly handles regexp and plain-text triggers, calling the associated function for every match in string.
+		This properly handles regexp and plain-text triggers, (both single and multiline), calling the associated function for every match in string.
 		It is assumed that 'matches' has been called and has returned true; otherwise running this is a waist
 		Args:
 			string - a string of text to look for matches in.
 		"""
 		if self.is_regexp:
-			for m in self.trig.finditer(string, flags=self.mode):
-				self.fn(string, m) # call the trigger's function
+			if self.multiline == False: # split string up into lines
+				for l in string.split("\r\n"): # And feed them to finditer
+					for m in self.trig.finditer(l, flags=self.mode):	
+						self.fn(l, m) # call the trigger's function
+			elif self.multiline: # multiline trig
+				# We can feed each trigger the hole block
+				for m in self.trig.finditer(string, flags=self.mode): # for every occurrence of this trigger in given block of text
+					self.fn(string, m) # call the trigger's function
 		elif self.regexp == False:
 			# Ugh, plain-text triggers
 			string = string.lower()

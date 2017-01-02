@@ -114,25 +114,21 @@ class Mbf(object):
 			self.exit("Incorrect username.")
 		
 		if self.mud_info['password_prompt'] and self.mud_info['password_command'] and l[r[0]] == self.mud_info['password_prompt']: # if we have a password prompt and command and the password prompt regexp matched
-			print("Password prompt matched!")
 			# First, run pre_password commands if any:
 			if self.mud_info['pre_password']:
 				self.send(self.mud_info['pre_password'])
 			# The mud is requesting a password, because our password_prompt regexp matched
-			p = self.mud_info['password_command'] %(self.credentials)
-			self.send(p) # Send the password command
-			print("Sent %s." %(p))
+			self.send(self.mud_info['password_command'] %(self.credentials)) # Send the password command
 			l = [self.mud_info['password_wrong']] # again, list of regexp(s) we expect to match
 			if self.mud_info['password_correct']:
 				l.append(self.mud_info['password_correct']) # add the correct password regexp to the expected list of matches
-			print("Expecting list...")
 			r = self.expect(l, self.timeout)
-			if self.mud_info['password_correct'] and l[r[0]] == self.mud_info['password_correct']: # the password_correct regexp exists and matches
+			if l[r[0]] == self.mud_info['password_correct']: # the password_correct regexp matches
 				# Login successful
 				# do successful things here
 				self.logged_in = True
 				return True # Our work is done
-			elif l[r[0]] != self.mud_info['password_wrong']: # the password isn't incorrect, and we don't know what a successful password attempt looks like, so let's assume things worked
+			elif r[0] == -1 and r[1] == None: # the password isn't incorrect, the expect timed out and we don't know what a successful password attempt looks like, so let's assume things worked
 				# login assumed
 				# do successful things here
 				self.logged_in = True
