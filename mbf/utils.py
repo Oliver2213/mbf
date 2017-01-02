@@ -26,7 +26,7 @@ def process_info_dict(d):
 	if type(d) != dict:
 		raise TypeError("This function expects a dictionary", type(d))
 	for k, v in d.iteritems():
-		if k.endswith('_prompt') or k.endswth('_wrong') or k.endswith('_correct'):
+		if k.endswith('_prompt') or k.endswith('_wrong') or k.endswith('_correct'):
 			if type(v) == str:
 				v = re.compile(v)
 				d[k] = v

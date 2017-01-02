@@ -11,7 +11,7 @@ from utils import match_regexp_list, process_info_dict
 
 class Mbf(object):
 	
-	def __init__(self, hostname, info, port=23, username=None, password=None, manage_login=True, autoconnect=True, reconnect=True):
+	def __init__(self, hostname, mud_info, port=23, username=None, password=None, auto_login=True, manage_login=True, autoconnect=True, reconnect=True, timeout=3):
 		"""Constructor for the main Mbf class
 		Args:
 			hostname: the hostname of your mud; this isn't optional for obvious reasons.
@@ -34,23 +34,25 @@ class Mbf(object):
 			Password: your mud account's password. As with username, you don't have to specify it here, but it helps if you want mbf to reconnect you and manage your logins.
 			manage_login: Should the framework worry about managing the login sequence? If set to true, the framework will use the values in the info dictionary to handle logging into the mud. Values like 'prompt_username', 'username_command', 'prompt_password', and 'password_command' are some of the values that the framework will use to correctly log in. If this is set to false, the user will need to make their own triggers for dealing with this. This is set to true by default.
 			autoconnect: automatically connect to the mud using hostname and port upon instance instantiation. This *does not* automatically log you in. Set this to false if you want to connect manually by calling connect().
-			autologin: Automatically log in after connecting. Requires that username and password are set, that appropriate values are set in the info dict, and that manage_login is True, will do nothing otherwise. Set this to false if you want to manually login by running login(). Note that login() has the same requirements, minus, of course, that this boolean be set to True.
+			auto_login: Automatically log in after connecting. Requires that username and password are set, that appropriate values are set in the info dict, and that manage_login is True, will do nothing otherwise. Set this to false if you want to manually login by running login() after running connect(). Note that login() has the same requirements, minus, of course, that this boolean be set to True.
+			timeout: The default timeout when expecting regular expressions from the mud. This is set to 3 seconds by default; if your network or that of the mud is slow you can increase this and mbf will wait longer when expecting.
 		"""
 		self.hostname = hostname
 		self.mud_info = process_info_dict(mud_info)
 		self.port = port
 		self.manage_login = manage_login
 		self.autoconnect = autoconnect
-		self.autologin = autologin
+		self.auto_login = auto_login
 		self.reconnect = reconnect
+		self.timeout = timeout
 		
 		if username and password:
 			self.credentials={} # Create a credentials dict so later these values can be used in login command strings
 			self.credentials['username'] = username
 			self.credentials['password'] = password
 		else: # we don't know username or password
-			if self.autologin:
-				self.autologin = False # we can't manage logins
+			if self.auto_login:
+				self.auto_login = False # we can't manage logins
 		
 		# self.connected is a boolean that indicates whether this instance of mbf is currently connected to a mud.
 		# At first, this is set to false, but connect() sets this to the telnet object's 'eof'
@@ -67,7 +69,7 @@ class Mbf(object):
 		self.read_until = self.tn.read_until
 		self.read_very_eager = self.tn.read_very_eager
 		self.expect = self.tn.expect
-		if self.autologin:
+		if self.auto_login and self.manage_login:
 			self.login() # Start our autologin sequence
 	
 	def disconnect(self):
@@ -90,11 +92,13 @@ class Mbf(object):
 		# We should be connected
 		if self.mud_info['pre_username']: # if we have commands to send before sending username_command
 			self.send(self.mud_info['pre_username']) # send them
-		# We use telnetlib's 'read_until' because we want the call to block, in case the mud is slow
-		self.read_until(self.mud_info['username_prompt'])
+		# We use telnetlib's expect method because it waits until it matches a list of regexps
+		r = self.expect([self.mud_info['username_prompt']], self.timeout)
+		if r[0] == -1 and r[1] == None: # expect timed out because username_prompt didn't match or didn't arrive within timeout
+			self.exit("Timeout while waiting for username prompt! \nThis could mean your username_prompt regular expression is incorrect or your network connection or that of the mud is too slow for the set timeout. \nMake sure your login_prompt regular expression is matching on your mud's login string, check your network connection, and try increasing the timeout value.")
 		if self.mud_info['username_command']:
 			# Send the username command, providing the credentials dict so the user has access to username and password values
-			send(self.mud_info['username_command'] %(self.credentials))
+			self.send(self.mud_info['username_command'] %(self.credentials))
 		else: # No specific command for the username
 			# Just send the username on it's own
 			self.send(self.credentials['username'])
@@ -102,7 +106,7 @@ class Mbf(object):
 		l = [self.mud_info['username_wrong']] # List of regexps we think might match
 		if self.mud_info['password_prompt']:
 			l.append(self.mud_info['password_prompt']) # We have a password prompt regexp, so we add it to the expected list of regexps
-		r = self.expect(l)
+		r = self.expect(l, self.timeout)
 		if l[r[0]] != self.mud_info['username_wrong']: # if the matching regexp is not password_wrong
 			if self.mud_info['post_username']:
 				self.send(self.mud_info['post_username'])
@@ -110,15 +114,19 @@ class Mbf(object):
 			self.exit("Incorrect username.")
 		
 		if self.mud_info['password_prompt'] and self.mud_info['password_command'] and l[r[0]] == self.mud_info['password_prompt']: # if we have a password prompt and command and the password prompt regexp matched
+			print("Password prompt matched!")
 			# First, run pre_password commands if any:
 			if self.mud_info['pre_password']:
 				self.send(self.mud_info['pre_password'])
 			# The mud is requesting a password, because our password_prompt regexp matched
-			self.send(self.mud_info['password_command'] %(self.credentials)) # Send the password command
+			p = self.mud_info['password_command'] %(self.credentials)
+			self.send(p) # Send the password command
+			print("Sent %s." %(p))
 			l = [self.mud_info['password_wrong']] # again, list of regexp(s) we expect to match
 			if self.mud_info['password_correct']:
 				l.append(self.mud_info['password_correct']) # add the correct password regexp to the expected list of matches
-			r = self.expect(l)
+			print("Expecting list...")
+			r = self.expect(l, self.timeout)
 			if self.mud_info['password_correct'] and l[r[0]] == self.mud_info['password_correct']: # the password_correct regexp exists and matches
 				# Login successful
 				# do successful things here
