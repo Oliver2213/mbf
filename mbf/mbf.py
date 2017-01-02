@@ -168,6 +168,8 @@ class Mbf(object):
 			"""This takes the trigger's associated function as the only argument
 			It defines the decorator and wrapper, as well as setting up the 'Trigger' object and associating it with the decorated function.
 			"""
+			if 'name' not in t_kwargs: # No name for this trigger was provided; use trigger's function name
+				t_kwargs['name'] = trigger_function.__name__
 			# Create an instance of the 'Trigger' class
 			new_trigger = Trigger(*t_args, **t_kwargs)  # provide all wrapper arguments to this 'trigger' instance
 			def wrapper(self, *args, **kwargs):
@@ -182,3 +184,20 @@ class Mbf(object):
 			self.triggers.append(new_trigger)
 			return wrapper
 		return decorator
+	
+	def enable_trigger(self, name):
+		"""Enable the trigger with given name"""
+		[t.enable() for t in self.triggers if t.name == name]
+	
+	def disable_trigger(self, name):
+		"""Disable the trigger with given name"""
+		[t.disable() for t in self.triggers if t.name == name]
+	
+	def enable_trigger_group(self, group):
+		"""Enable all triggers in the given group"""
+		[t.enable() for t in self.triggers if t.group == group]
+	
+	def disable_trigger_group(self, group):
+		"""Disable all triggers in the given group"""
+		[t.disable() for t in self.triggers if t.group == group]
+	

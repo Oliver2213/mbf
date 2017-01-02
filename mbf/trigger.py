@@ -6,7 +6,7 @@ import re
 
 
 class Trigger(object):
-	def __init__(self, trig, is_regexp=True, case_sensitive=True, name=None, enabled=True, stop_processing=False, sequence=100):
+	def __init__(self, trig, is_regexp=True, case_sensitive=True, name=None, group='all', enabled=True, stop_processing=False, sequence=100):
 		"""This class represents a trigger and it's metadata;
 			It does not store code, as it's intended that a function in mbf will "decorate" user functions with a trigger class,
 		Arguments:
@@ -26,6 +26,7 @@ class Trigger(object):
 		self.is_regexp = is_regexp
 		self.case_sensitive = case_sensitive
 		self.name = name
+		self.group = group
 		self.enabled = enabled
 		self.sequence = sequence
 		self.stop_processing = stop_processing
@@ -85,6 +86,14 @@ class Trigger(object):
 			for l in lines:
 				if self.trig in l:
 					return self.fn(string, None) # call associated function and return it's value
+	
+	def enable(self):
+		"""Enable this trigger"""
+		self.enabled = True
+	
+	def disable(self):
+		"""Disable this trigger"""
+		self.enabled = False
 	
 	# Comparison methods, so that sort() will properly sort on sequence
 
