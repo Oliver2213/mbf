@@ -5,7 +5,10 @@ import re
 import telnetlib
 import sys
 
+from apscheduler.schedulers.background import BackgroundScheduler
+
 from trigger import Trigger
+from timer import Timer
 from utils import match_regexp_list, process_info_dict
 
 
@@ -46,6 +49,8 @@ class Mbf(object):
 		self.reconnect = reconnect
 		self.timeout = timeout
 		self.triggers = []
+		self.timers = []
+		self.scheduler = BackgroundScheduler()
 		
 		if username and password:
 			self.credentials={} # Create a credentials dict so later these values can be used in login command strings
@@ -60,7 +65,6 @@ class Mbf(object):
 		self.connected = False
 		if self.autoconnect:
 			self.connect()
-		# self.tn = None
 	
 	def connect(self):
 		"""Method to connect to the provided host using the provided port. Method is ran automatically at class instantiation if autoconnect is set to true; also handles auto logins if that option is enabled"""
@@ -145,11 +149,12 @@ class Mbf(object):
 			self.disconnect()
 		sys.exit(code)
 	
-	def process_triggers(self):
-		"""Begin trigger processing
+	def start_processing(self):
+		"""Begin trigger processing and start the scheduler
 		"""
 		self.triggers.sort() # put the trigger list in order of sequence
 		self.running = True
+		self.scheduler.start()
 		while self.running:
 			buff = self.read_very_eager()
 			for t in self.triggers :
@@ -207,3 +212,27 @@ class Mbf(object):
 		"""Disable all triggers in the given group"""
 		[t.disable() for t in self.triggers if t.group == group]
 	
+	def timer(self, *t_args, **t_kwargs):
+		"""Method that returns a decorator to automatically set up a timer and associate it with a function to run at the specified time
+		Code in this function gets executed immediately, not when the associated function runs.
+		It dynamically accepts arguments and passes them off to a 'Timer' class instance
+		"""
+		def decorator(timer_function):
+			"""This takes the timer's associated function as the only argument
+			It defines the decorator and wrapper, as well as setting up the 'Timer' object and associating it with the decorated function.
+			"""
+			if 'name' not in t_kwargs: # No name for this timer was provided; use function name
+				t_kwargs['name'] = timer_function.__name__
+			# Create an instance of the 'Timer' class
+			new_timer = Timer(self.scheduler, *t_args, **t_kwargs)  # provide a reffrence to the scheduler and all wrapper arguments to this instance
+			def wrapper(*args, **kwargs):
+				"""This function is what will be called in place of the decorated function;
+				It takes the arguments given to it and passes them on to the provided function.
+				"""
+				r = timer_function(*args, **kwargs) # call the original trigger function
+				return r
+			new_timer.add_function(wrapper) # Associate the wrapper with the timer object
+			# add the timer to an internal list
+			self.timers.append(new_timer)
+			return wrapper
+		return decorator
