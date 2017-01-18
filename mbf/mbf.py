@@ -51,6 +51,7 @@ class Mbf(object):
 		self.triggers = []
 		self.timers = []
 		self.scheduler = BackgroundScheduler()
+		self.g = {} # global dictionary for client code to store things in
 		
 		if username and password:
 			self.credentials={} # Create a credentials dict so later these values can be used in login command strings
