@@ -149,14 +149,21 @@ class Mbf(object):
 			self.disconnect()
 		sys.exit(code)
 	
-	def start_processing(self):
+	def start_processing(self, print_output=False):
 		"""Begin trigger processing and start the scheduler
+		args:
+			print_output: Send what the mud sends to stdin before executing triggers.
 		"""
+		self.print_output = print_output
 		self.triggers.sort() # put the trigger list in order of sequence
 		self.running = True
 		self.scheduler.start()
 		while self.running:
 			buff = self.read_very_eager()
+			if self.print_output:
+				for line in buff.strip().split('\r\n'):
+					if line != '':
+						print(line)
 			for t in self.triggers :
 				if t.enabled: # Iff this trigger is enabled
 					# Quickly check if there is at least one match for this trigger in the buffer
