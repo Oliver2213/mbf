@@ -27,11 +27,11 @@ class Timer(object):
 		self.one_shot = one_shot
 		self.run_limit = run_limit
 		self.fn = None
-		self.run_count = 1 # because we start counting at 0, we set it to one so run_limit makes sense
+		self.run_count = 0
 		self.job = self.scheduler.add_job(self.fire, self.type, *args, **kwargs)
 		if self.enabled == False:
 			self.job.pause()
-		if self.one_shot and self.run_limit > 1:
+		if self.one_shot and self.run_limit > 1: # one_shot overrides run_limit
 			self.run_limit = 1
 	
 	def fire(self, *function_args, **function_kwargs):
@@ -41,6 +41,7 @@ class Timer(object):
 		"""		
 		if self.fn is not None:
 			if self.run_limit==-1 or self.run_count <= self.run_limit:
+				# if we don't have a run limit, or we do and the run count is less than said limit 
 				self.fn(*function_args, **function_kwargs)
 				self.run_count += 1
 			else: # no more runs for this timer

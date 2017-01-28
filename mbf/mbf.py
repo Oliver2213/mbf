@@ -220,6 +220,22 @@ class Mbf(object):
 		"""Disable all triggers in the given group"""
 		[t.disable() for t in self.triggers if t.group == group]
 	
+	def enable_timer(self, name):
+		"""Enable the timer with given name"""
+		[t.enable() for t in self.timers if t.name == name]
+	
+	def disable_timer(self, name):
+		"""Disable the timer with given name"""
+		[t.disable() for t in self.timers if t.name == name]
+	
+	def enable_timer_group(self, group):
+		"""Enable all timers in the given group"""
+		[t.enable() for t in self.timers if t.group == group]
+	
+	def disable_timer_group(self, group):
+		"""Disable all timers in the given group"""
+		[t.disable() for t in self.timers if t.group == group]
+	
 	def timer(self, *t_args, **t_kwargs):
 		"""Method that returns a decorator to automatically set up a timer and associate it with a function to run at the specified time
 		Code in this function gets executed immediately, not when the associated function runs.
