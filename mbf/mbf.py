@@ -162,7 +162,7 @@ class Mbf(object):
 		while self.running:
 			buff = self.read_very_eager()
 			if self.print_output:
-				for line in buff.strip().split('\r\n'):
+				for line in buff.strip().splitlines():
 					if line != '':
 						print(line)
 			for t in self.triggers :

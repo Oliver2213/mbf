@@ -83,7 +83,7 @@ class Trigger(object):
 		"""
 		if self.is_regexp:
 			if self.multiline == False: # split string up into lines
-				for l in string.split("\r\n"): # And feed them to finditer
+				for l in string.splitlines(): # And feed them to finditer
 					for m in self.trig.finditer(l):	
 						self.fn(l, m) # call the trigger's function
 			elif self.multiline: # multiline trig
