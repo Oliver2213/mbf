@@ -142,10 +142,14 @@ class Mbf(object):
 			elif l[r[0]] == self.mud_info['password_wrong']: # incorrect password regexp matched
 				self.exit("Incorrect password.")
 	
-	def exit(self, reason, code=1):
+	def exit(self, reason="", code=0):
 		"""Centralized exiting function"""
-		print(reason)
-		print("Exiting.")
+		if reason is not "":
+			print(reason)
+		else:
+			print("Exiting.")
+		if self.running:
+			self.running=False
 		if self.connected:
 			self.disconnect()
 		sys.exit(code)
