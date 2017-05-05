@@ -272,3 +272,4 @@ def process_triggers(m):
 					stp = t.fire(buff) # stop trigger processing
 					if stp: # if the trigger function returned true or the trigger has stop_processing set
 						break # Don't do any more trigger processing for this buffer of data
+		time.sleep(0.2)
