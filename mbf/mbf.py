@@ -3,7 +3,9 @@
 
 import re
 import telnetlib
+import select
 import sys
+import threading
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
@@ -50,6 +52,7 @@ class Mbf(object):
 		self.timeout = timeout
 		self.triggers = []
 		self.timers = []
+		self.stopped = threading.Event() # the event that when set will stop trigger processing
 		self.scheduler = BackgroundScheduler()
 		self.g = {} # global dictionary for client code to store things in
 		
@@ -148,8 +151,8 @@ class Mbf(object):
 			print(reason)
 		else:
 			print("Exiting.")
-		if self.running:
-			self.running=False
+		if not self.stopped.is_set():
+			self.stopped.set()
 		if self.connected:
 			self.disconnect()
 		sys.exit(code)
@@ -161,23 +164,9 @@ class Mbf(object):
 		"""
 		self.print_output = print_output
 		self.triggers.sort() # put the trigger list in order of sequence
-		self.running = True
 		self.scheduler.start()
-		while self.running:
-			buff = self.read_very_eager()
-			if self.print_output:
-				for line in buff.strip().splitlines():
-					if line != '':
-						print(line)
-			for t in self.triggers :
-				if t.enabled: # Iff this trigger is enabled
-					# Quickly check if there is at least one match for this trigger in the buffer
-					if t.matches(buff):
-						# Find all matches of this trigger in the buffer and call the associated function for each one
-						# Basically, "fire" this trigger
-						stop = t.fire(buff)
-						if stop: # if the trigger function returned true or the trigger has stop_processing set
-							break # Don't do any more trigger processing for this buffer of data
+		t = threading.Thread(name="trigger_processor", target=process_triggers, args=(self,))
+		t.start()
 	
 	def trigger(self, *t_args, **t_kwargs):
 		"""Method that returns a decorator to automatically set up a trigger and associate it with a function to run when the trigger is matched
@@ -264,3 +253,22 @@ class Mbf(object):
 			self.timers.append(new_timer)
 			return wrapper
 		return decorator
+
+
+def process_triggers(m):
+	"""Function that handles trigger processing in the background."""
+	while not m.stopped.is_set():
+		r, w, e = select.select([m.tn.sock], [], [])
+		if r:
+			buff = m.read_very_eager()
+			if m.print_output:
+				for line in buff.strip().splitlines():
+					if line != '':
+						print(line)
+			for t in m.triggers :
+				if t.enabled and t.matches(buff):
+					# Find all matches of this trigger in the buffer and call the associated function for each one
+					# Basically, "fire" this trigger
+					stp = t.fire(buff) # stop trigger processing
+					if stp: # if the trigger function returned true or the trigger has stop_processing set
+						break # Don't do any more trigger processing for this buffer of data
