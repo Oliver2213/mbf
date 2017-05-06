@@ -155,7 +155,7 @@ class Mbf(object):
 			print("Exiting.")
 		if not self.stopped.is_set():
 			self.stopped.set()
-		self.scheduler.stop()
+		self.scheduler.shutdown()
 		if self.connected:
 			self.disconnect()
 		sys.exit(code)
