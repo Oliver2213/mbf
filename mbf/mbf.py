@@ -181,8 +181,8 @@ class Mbf(object):
 		"""Stop the scheduler and the trigger processing thread."""
 		if self.scheduler.running:
 			self.scheduler.shutdown()
-		if not self.stop.is_set():
-			self.stop.set()
+		if not self.stopped.is_set():
+			self.stopped.set()
 	
 	def on_connect(self):
 		"""Callback that subclasses can override to do something when the connection is established to the mud."""
