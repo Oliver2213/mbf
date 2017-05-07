@@ -87,7 +87,7 @@ class Mbf(object):
 	def disconnect(self):
 		"""Close the telnet connection"""
 		self.tn.close()
-		self.on_disconnect(True) # a deliberate disconnect
+		self.on_disconnect(self, True) # a deliberate disconnect
 
 	def send(self, msg, prefix = "", suffix = '\n'):
 		"""'write' to the telnet connection, with the provided prefix and suffix. The provided type can be either a string (in which case it will be sent directly), or a list of strings (which will be iterated over and sent, in the order which the items were added."""
