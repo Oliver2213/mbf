@@ -174,6 +174,8 @@ class Mbf(object):
 		self.print_output = print_output
 		self.triggers.sort() # put the trigger list in order of sequence
 		self.scheduler.start()
+		if self.stopped.is_set():
+			self.stopped.clear()
 		t = threading.Thread(name="trigger_processor", target=process_triggers, args=(self,))
 		t.start()
 	
