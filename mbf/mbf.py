@@ -76,6 +76,7 @@ class Mbf(object):
 		"""Method to connect to the provided host using the provided port. Method is ran automatically at class instantiation if autoconnect is set to true; also handles auto logins if that option is enabled"""
 		self.tn = telnetlib.Telnet(self.hostname, self.port)
 		self.connected = self.tn.eof
+		self.on_connect()
 		# some handy Telnet class local mappings (for easing client implementation and easier wrapping if necessary):
 		self.read_until = self.tn.read_until
 		self.read_very_eager = self.tn.read_very_eager
@@ -86,14 +87,21 @@ class Mbf(object):
 	def disconnect(self):
 		"""Close the telnet connection"""
 		self.tn.close()
-	
+		self.on_disconnect(True) # a deliberate disconnect
+
 	def send(self, msg, prefix = "", suffix = '\n'):
 		"""'write' to the telnet connection, with the provided prefix and suffix. The provided type can be either a string (in which case it will be sent directly), or a list of strings (which will be iterated over and sent, in the order which the items were added."""
-		if type(msg) == str:
-			self.tn.write(prefix+msg+suffix)
-		elif type(msg) == list:
-			for command in list:
-				self.tn.write(prefix+command+suffix)
+		try:
+			if type(msg) == str:
+				self.tn.write(prefix+msg+suffix)
+			elif type(msg) == list:
+				for command in list:
+					self.tn.write(prefix+command+suffix)
+		except EOFError as e:
+			# the connection is broken
+			self.stop_processing()
+			self.on_disconnect(False)
+			return False
 	
 	
 	def login(self):
@@ -153,9 +161,7 @@ class Mbf(object):
 			print(reason)
 		else:
 			print("Exiting.")
-		if not self.stopped.is_set():
-			self.stopped.set()
-		self.scheduler.shutdown()
+		self.stop_processing()
 		if self.connected:
 			self.disconnect()
 		sys.exit(code)
@@ -170,6 +176,24 @@ class Mbf(object):
 		self.scheduler.start()
 		t = threading.Thread(name="trigger_processor", target=process_triggers, args=(self,))
 		t.start()
+	
+	def stop_processing(self):
+		"""Stop the scheduler and the trigger processing thread."""
+		if self.scheduler.running:
+			m.scheduler.shutdown()
+		if not m.stop.is_set():
+			m.stop.set()
+	
+	def on_connect(self):
+		"""Callback that subclasses can override to do something when the connection is established to the mud."""
+		pass
+	
+	def on_disconnect(self, deliberate=False):
+		"""Callback that subclasses can override to do something when the connection to the mud gets broken.
+Args:
+	deliberate: True if the connection was deliberately broken by the framework (e.g. disconnect() was called).
+		"""
+		pass
 	
 	def trigger(self, *t_args, **t_kwargs):
 		"""Method that returns a decorator to automatically set up a trigger and associate it with a function to run when the trigger is matched
@@ -261,18 +285,22 @@ class Mbf(object):
 def process_triggers(m):
 	"""Function that handles trigger processing in the background."""
 	while not m.stopped.is_set():
-		r, w, e = select.select([m.tn.sock], [], [])
-		if r:
-			buff = m.read_very_eager()
-			if m.print_output:
-				for line in buff.strip().splitlines():
-					if line != '':
-						print(line)
-			for t in m.triggers :
-				if t.enabled and t.matches(buff):
-					# Find all matches of this trigger in the buffer and call the associated function for each one
-					# Basically, "fire" this trigger
-					stp = t.fire(buff) # stop trigger processing
-					if stp: # if the trigger function returned true or the trigger has stop_processing set
-						break # Don't do any more trigger processing for this buffer of data
-		time.sleep(0.2)
+		try:
+			r, w, e = select.select([m.tn.sock], [], [])
+			if r:
+				buff = m.read_very_eager()
+				if m.print_output:
+					for line in buff.strip().splitlines():
+						if line != '':
+							print(line)
+				for t in m.triggers :
+					if t.enabled and t.matches(buff):
+						# Find all matches of this trigger in the buffer and call the associated function for each one
+						# Basically, "fire" this trigger
+						stp = t.fire(buff) # stop trigger processing
+						if stp: # if the trigger function returned true or the trigger has stop_processing set
+							break # Don't do any more trigger processing for this buffer of data
+			time.sleep(0.2)
+		except EOFError as e: # connection is closed
+			m.on_disconnect()
+			m.stop_processing()
