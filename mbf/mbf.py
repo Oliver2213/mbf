@@ -180,9 +180,9 @@ class Mbf(object):
 	def stop_processing(self):
 		"""Stop the scheduler and the trigger processing thread."""
 		if self.scheduler.running:
-			m.scheduler.shutdown()
-		if not m.stop.is_set():
-			m.stop.set()
+			self.scheduler.shutdown()
+		if not self.stop.is_set():
+			self.stop.set()
 	
 	def on_connect(self):
 		"""Callback that subclasses can override to do something when the connection is established to the mud."""
@@ -302,5 +302,5 @@ def process_triggers(m):
 							break # Don't do any more trigger processing for this buffer of data
 			time.sleep(0.2)
 		except EOFError as e: # connection is closed
-			m.on_disconnect()
+			m.on_disconnect(m, deliberate=False)
 			m.stop_processing()
