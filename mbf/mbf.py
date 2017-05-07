@@ -302,5 +302,5 @@ def process_triggers(m):
 							break # Don't do any more trigger processing for this buffer of data
 			time.sleep(0.2)
 		except EOFError as e: # connection is closed
-			m.on_disconnect(m, deliberate=False)
 			m.stop_processing()
+			m.on_disconnect(m, deliberate=False)
