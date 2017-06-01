@@ -21,7 +21,7 @@ class Trigger(object):
 				Triggers can be disabled when created, and when required, enabled by other code when needed.
 			stop_processing: A bool, false by default, that tells the parser to stop firing triggers after this one.
 			sequence: An integer (100 by default) that is used to determine the order in which triggers will be fired.
-				Triggers will be fired from lowest sequence to highest; if any trigger tells the parser to stop firing, no more triggers (no matter their sequence) will be fired afterwards.
+				Triggers will be fired from lowest sequence to highest; if any trigger tells the parser to stop firing, no more triggers (no matter their sequence) will be fired afterwards for that specific buffer of data.
 		"""
 		self.trig = trig
 		self.is_regexp = is_regexp
@@ -41,7 +41,8 @@ class Trigger(object):
 			# After setting modes, compile the re pattern object with them
 			self.trig = re.compile(self.trig, flags=self.mode) # compile into a re pattern object
 		else:
-			self.trig = self.trig.lower()
+			if self.case_sensitive == False:
+				self.trig = self.trig.lower()
 	
 	def add_function(self, f):
 		"""Add a function to an instance of this class; this function will be what gets run when this trigger matches
@@ -90,15 +91,20 @@ class Trigger(object):
 				# We can feed each trigger the hole block
 				for m in self.trig.finditer(string): # for every occurrence of this trigger in given block of text
 					self.fn(string, m) # call the trigger's function
-		elif self.regexp == False:
+		elif self.is_regexp == False:
 			# Ugh, plain-text triggers
-			string = string.lower()
-			# split string by lines
-			lines = string.split('\n')
-			# line by line text matching iteration
-			for l in lines:
-				if self.trig in l:
-					return self.fn(string, None) # call associated function and return it's value
+			if self.case_sensitive == False:
+				string = string.lower()
+			if self.multiline:
+				if self.trig  in string:
+					return self.fn(string, None)
+			else: # not multiline
+				# split string by lines
+				lines = string.splitlines()
+				# line by line text matching iteration
+				for l in lines:
+					if self.trig in l:
+						return self.fn(string, None) # call associated function and return it's value
 	
 	def enable(self):
 		"""Enable this trigger"""
@@ -116,3 +122,6 @@ class Trigger(object):
 	__le__ = lambda self, other: self.sequence <= other.sequence
 	__gt__ = lambda self, other: self.sequence > other.sequence
 	__ge__ = lambda self, other: self.sequence >= other.sequence
+
+	def __repr__(self):
+		return """<trigger {}>""".format(self.name)
