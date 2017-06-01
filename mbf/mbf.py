@@ -7,6 +7,7 @@ import select
 import sys
 import threading
 import time
+import logging
 
 
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -18,7 +19,7 @@ from utils import match_regexp_list, process_info_dict
 
 class Mbf(object):
 	
-	def __init__(self, hostname, mud_info, port=23, username=None, password=None, auto_login=True, manage_login=True, autoconnect=True, reconnect=True, timeout=3):
+	def __init__(self, hostname, mud_info, port=23, username=None, password=None, auto_login=True, manage_login=True, autoconnect=True, reconnect=True, timeout=3, trigger_delay=0.1):
 		"""Constructor for the main Mbf class
 		Args:
 			hostname: the hostname of your mud; this isn't optional for obvious reasons.
@@ -43,7 +44,11 @@ class Mbf(object):
 			autoconnect: automatically connect to the mud using hostname and port upon instance instantiation. This *does not* automatically log you in. Set this to false if you want to connect manually by calling connect().
 			auto_login: Automatically log in after connecting. Requires that username and password are set, that appropriate values are set in the info dict, and that manage_login is True, will do nothing otherwise. Set this to false if you want to manually login by running login() after running connect(). Note that login() has the same requirements, minus, of course, that this boolean be set to True.
 			timeout: The default timeout when expecting regular expressions from the mud. This is set to 3 seconds by default; if your network or that of the mud is slow you can increase this and mbf will wait longer when expecting.
+			trigger_delay: The amount of time for the trigger processor thread to sleep in between reading chunks of data from the socket. This is usually something you won't need to mess with; it's just here so that the CPU doesn't spike needlessly.
 		"""
+		self.log = logging.getLogger("mbf")
+		self.log.addHandler(logging.NullHandler())
+		self.log.info("Initializing")
 		self.hostname = hostname
 		self.mud_info = process_info_dict(mud_info)
 		self.port = port
@@ -52,6 +57,7 @@ class Mbf(object):
 		self.auto_login = auto_login
 		self.reconnect = reconnect
 		self.timeout = timeout
+		self.trigger_delay = trigger_delay
 		self.triggers = []
 		self.timers = []
 		self.stopped = threading.Event() # the event that when set will stop trigger processing
@@ -59,38 +65,50 @@ class Mbf(object):
 		self.g = {} # global dictionary for client code to store things in
 		
 		if username and password:
+			self.log.debug("A username and password were both provided")
 			self.credentials={} # Create a credentials dict so later these values can be used in login command strings
 			self.credentials['username'] = username
 			self.credentials['password'] = password
 		else: # we don't know username or password
 			if self.auto_login:
+				self.log.warn("Mbf was told to manage logins, but was not provided a username and password; disabling automatic login management")
 				self.auto_login = False # we can't manage logins
 		
 		# self.connected is a boolean that indicates whether this instance of mbf is currently connected to a mud.
 		# At first, this is set to false, but connect() sets this to the telnet object's 'eof'
 		self.connected = False
 		if self.autoconnect:
+			self.log.debug("Autoconnecting")
 			self.connect()
-	
+		self.log.info("Initialized")
+
 	def connect(self):
 		"""Method to connect to the provided host using the provided port. Method is ran automatically at class instantiation if autoconnect is set to true; also handles auto logins if that option is enabled"""
+		self.log.info("""Connecting to host {}, port {}""".format(self.hostname, self.port))
 		self.tn = telnetlib.Telnet(self.hostname, self.port)
+		self.log.debug("Connection established")
 		self.connected = self.tn.eof
+		self.log.debug("Running on_connect callback")
 		self.on_connect()
 		# some handy Telnet class local mappings (for easing client implementation and easier wrapping if necessary):
 		self.read_until = self.tn.read_until
 		self.read_very_eager = self.tn.read_very_eager
 		self.expect = self.tn.expect
 		if self.auto_login and self.manage_login:
+			self.log.info("Automatically logging in after connecting")
 			self.login() # Start our autologin sequence
 	
 	def disconnect(self):
 		"""Close the telnet connection"""
+		self.log.info("Disconnected")
 		self.tn.close()
+		self.stop_processing()
+		self.log.debug("Calling on_disconnected callback")
 		self.on_disconnect(self, True) # a deliberate disconnect
 
 	def send(self, msg, prefix = "", suffix = '\n'):
 		"""'write' to the telnet connection, with the provided prefix and suffix. The provided type can be either a string (in which case it will be sent directly), or a list of strings (which will be iterated over and sent, in the order which the items were added."""
+		self.log.debug("""Sending to the mud: {}""".format(prefix+msg+suffix))
 		try:
 			if type(msg) == str:
 				self.tn.write(prefix+msg+suffix)
@@ -98,57 +116,81 @@ class Mbf(object):
 				for command in list:
 					self.tn.write(prefix+command+suffix)
 		except EOFError as e:
+			self.log.error("""Could not send "{}"; connection broken""".format(prefix+msg+suffix))
 			# the connection is broken
 			self.stop_processing()
+			self.log.debug("Calling on_disconnect callback")
 			self.on_disconnect(False)
 			return False
 	
 	
 	def login(self):
 		"""Manage logging into a mud"""
+		self.log.info("Logging in")
 		if 'username_prompt' in self.mud_info.keys() == False:
 			self.exit("Auto login failed, no username prompt provided. Please add this to your info dictionary passed to the framework's constructor")
 		# We should be connected
 		if self.mud_info['pre_username']: # if we have commands to send before sending username_command
+			self.log.debug("Commands need to be sent before sending the username")
 			self.send(self.mud_info['pre_username']) # send them
+			self.log.debug("Done sending pre-username commands")
 		# We use telnetlib's expect method because it waits until it matches a list of regexps
+		self.log.debug("Expecting the username prompt")
 		r = self.expect([self.mud_info['username_prompt']], self.timeout)
+		self.log.debug("""Expect returned {}""".format(r))
 		if r[0] == -1 and r[1] == None: # expect timed out because username_prompt didn't match or didn't arrive within timeout
 			self.exit("Timeout while waiting for username prompt! \nThis could mean your username_prompt regular expression is incorrect or your network connection or that of the mud is too slow for the set timeout. \nMake sure your login_prompt regular expression is matching on your mud's login string, check your network connection, and try increasing the timeout value.")
+		else:
+			self.log.debug("Matched username prompt")
 		if self.mud_info['username_command']:
 			# Send the username command, providing the credentials dict so the user has access to username and password values
+			self.log.debug("Sending username command")
 			self.send(self.mud_info['username_command'] %(self.credentials))
 		else: # No specific command for the username
 			# Just send the username on it's own
+			self.log.debug("No specific username command was provided; just sending the username on it's own")
 			self.send(self.credentials['username'])
 		
 		l = [self.mud_info['username_wrong']] # List of regexps we think might match
+		self.log.debug("Added the wrong_username regexp to the list of regular expressions we're looking to match")
 		if self.mud_info['password_prompt']:
 			l.append(self.mud_info['password_prompt']) # We have a password prompt regexp, so we add it to the expected list of regexps
+			self.log.debug("Added the password_prompt regexp to the list of regular expressions we're looking to match")
+		self.log.debug("Expecting a regular expression")
 		r = self.expect(l, self.timeout)
-		if l[r[0]] != self.mud_info['username_wrong']: # if the matching regexp is not password_wrong
+		if l[r[0]] != self.mud_info['username_wrong']: # if the matching regexp is not username_wrong
+			self.log.debug("The regular expression matched was not the one for an incorrect username")
 			if self.mud_info['post_username']:
+				self.log.debug("Sending post-username commands")
 				self.send(self.mud_info['post_username'])
 		else: # incorrect username
 			self.exit("Incorrect username.")
 		
 		if self.mud_info['password_prompt'] and self.mud_info['password_command'] and l[r[0]] == self.mud_info['password_prompt']: # if we have a password prompt and command and the password prompt regexp matched
+			self.log.debug("Password prompt and command were given, and the matching regular expression is password_correct")
 			# First, run pre_password commands if any:
 			if self.mud_info['pre_password']:
+				self.log.debug("Running pre-password commands")
 				self.send(self.mud_info['pre_password'])
 			# The mud is requesting a password, because our password_prompt regexp matched
+			self.log.debug("Sending password command")
 			self.send(self.mud_info['password_command'] %(self.credentials)) # Send the password command
 			l = [self.mud_info['password_wrong']] # again, list of regexp(s) we expect to match
+			self.log.debug("Added the password_wrong regular expression to the list of expected matches")
 			if self.mud_info['password_correct']:
 				l.append(self.mud_info['password_correct']) # add the correct password regexp to the expected list of matches
+				self.log.debug("Added the password_correct regular expression to the list of expected matches")
+			self.log.debug("Expecting a password-related regular expression to match")
 			r = self.expect(l, self.timeout)
 			if l[r[0]] == self.mud_info['password_correct']: # the password_correct regexp matches
 				# Login successful
+				self.log.info("Successfully logged in")
 				# do successful things here
 				self.logged_in = True
 				return True # Our work is done
 			elif r[0] == -1 and r[1] == None: # the password isn't incorrect, the expect timed out and we don't know what a successful password attempt looks like, so let's assume things worked
 				# login assumed
+				self.log.info("Assumed successful login ")
 				# do successful things here
 				self.logged_in = True
 				return True
@@ -158,9 +200,15 @@ class Mbf(object):
 	def exit(self, reason="", code=0):
 		"""Centralized exiting function"""
 		if reason is not "":
-			print(reason)
+			if code==0:
+				self.log.info("Exiting - "+reason)
+			else:
+				self.log.critical("Exiting - "+reason)
 		else:
-			print("Exiting.")
+			if code == 0:
+				self.log.info("Exiting")
+			else:
+				self.log.critical("Exiting")
 		self.stop_processing()
 		if self.connected:
 			self.disconnect()
@@ -171,20 +219,33 @@ class Mbf(object):
 		args:
 			print_output: Send what the mud sends to stdin before executing triggers.
 		"""
+		self.log.debug("Starting processing")
 		self.print_output = print_output
+		self.log.debug("Sorting triggers")
 		self.triggers.sort() # put the trigger list in order of sequence
+		self.log.debug("Triggers sorted")
+		self.log.debug("Starting background scheduler")
 		self.scheduler.start()
+		self.log.debug("Background scheduler started")
 		if self.stopped.is_set():
+			self.log.debug("Stop was set; cleared")
 			self.stopped.clear()
+		self.log.debug("Starting trigger processor thread")
 		t = threading.Thread(name="trigger_processor", target=process_triggers, args=(self,))
 		t.start()
-	
+		self.log.debug("Trigger processor started")
+		self.log.info("Processing started")	
+
 	def stop_processing(self):
 		"""Stop the scheduler and the trigger processing thread."""
+		self.log.debug("Stopping processing")
 		if self.scheduler.running:
+			self.log.debug("Background scheduler is running; shutting down")
 			self.scheduler.shutdown()
+			self.log.debug("Background scheduler shut down")
 		if not self.stopped.is_set():
 			self.stopped.set()
+			self.log.debug("Stop flag for trigger processor set; that thread should end soon")
 	
 	def on_connect(self):
 		"""Callback that subclasses can override to do something when the connection is established to the mud."""
@@ -193,7 +254,7 @@ class Mbf(object):
 	def on_disconnect(self, deliberate=False):
 		"""Callback that subclasses can override to do something when the connection to the mud gets broken.
 Args:
-	deliberate: True if the connection was deliberately broken by the framework (e.g. disconnect() was called).
+	deliberate: True if the connection was deliberately broken by the framework (e.g. disconnect() was called), false if otherwise.
 		"""
 		pass
 	
@@ -228,34 +289,42 @@ Args:
 	
 	def enable_trigger(self, name):
 		"""Enable the trigger with given name"""
+		self.log.debug("Enable trigger {}".format(name))
 		[t.enable() for t in self.triggers if t.name == name]
 	
 	def disable_trigger(self, name):
 		"""Disable the trigger with given name"""
+		self.log.debug("Disable trigger {}".format(name))
 		[t.disable() for t in self.triggers if t.name == name]
 	
 	def enable_trigger_group(self, group):
 		"""Enable all triggers in the given group"""
+		self.log.debug("Enable trigger group {}".format(group))
 		[t.enable() for t in self.triggers if t.group == group]
 	
 	def disable_trigger_group(self, group):
 		"""Disable all triggers in the given group"""
+		self.log.debug("Disable trigger group {}".format(group))
 		[t.disable() for t in self.triggers if t.group == group]
 	
 	def enable_timer(self, name):
 		"""Enable the timer with given name"""
+		self.log.debug("Enable timer {}".format(name))
 		[t.enable() for t in self.timers if t.name == name]
 	
 	def disable_timer(self, name):
 		"""Disable the timer with given name"""
+		self.log.debug("Disable timer {}".format(name))
 		[t.disable() for t in self.timers if t.name == name]
 	
 	def enable_timer_group(self, group):
 		"""Enable all timers in the given group"""
+		self.log.debug("Enable timer group {}".format(group))
 		[t.enable() for t in self.timers if t.group == group]
 	
 	def disable_timer_group(self, group):
 		"""Disable all timers in the given group"""
+		self.log.debug("Disable timer group {}".format(group))
 		[t.disable() for t in self.timers if t.group == group]
 	
 	def timer(self, *t_args, **t_kwargs):
@@ -286,23 +355,28 @@ Args:
 
 def process_triggers(m):
 	"""Function that handles trigger processing in the background."""
+	log = logging.getLogger("mbf.trigger_processor")
 	while not m.stopped.is_set():
 		try:
 			r, w, e = select.select([m.tn.sock], [], [])
 			if r:
 				buff = m.read_very_eager()
+				log.debug("""Got buffer of data: {}""".format(buff))
 				if m.print_output:
 					for line in buff.strip().splitlines():
 						if line != '':
 							print(line)
 				for t in m.triggers :
 					if t.enabled and t.matches(buff):
+						log.debug("""{} matches on something in the current buffer""".format(t))
 						# Find all matches of this trigger in the buffer and call the associated function for each one
 						# Basically, "fire" this trigger
-						stp = t.fire(buff) # stop trigger processing
+						stp = t.fire(buff) # stop trigger processing if this returns true
 						if stp: # if the trigger function returned true or the trigger has stop_processing set
+							log.debug("""{} stopped processing for the current buffer""".format(t))
 							break # Don't do any more trigger processing for this buffer of data
-			time.sleep(0.2)
+			time.sleep(m.trigger_delay)
 		except EOFError as e: # connection is closed
+			log.debug("EOF error when reading a buffer for trigger processing")
 			m.stop_processing()
-			m.on_disconnect(m, deliberate=False)
+			m.on_disconnect(deliberate=False)
