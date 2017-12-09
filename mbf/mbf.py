@@ -107,7 +107,7 @@ class Mbf(object):
 		self.on_disconnect(self, True) # a deliberate disconnect
 
 	def send(self, msg, prefix = "", suffix = '\n'):
-		"""'write' to the telnet connection, with the provided prefix and suffix. The provided type can be either a string (in which case it will be sent directly), or a list of strings (which will be iterated over and sent, in the order which the items were added."""
+		"""'write' to the telnet connection, with the provided prefix and suffix. The provided type can be either a string (in which case it will be sent directly), or a list of strings (which will be iterated over and sent, in the order which the items were added)."""
 		self.log.debug("""Sending to the mud: {}""".format(prefix+msg+suffix))
 		try:
 			if type(msg) == str:
@@ -127,7 +127,7 @@ class Mbf(object):
 	def login(self):
 		"""Manage logging into a mud"""
 		self.log.info("Logging in")
-		if 'username_prompt' in self.mud_info.keys() == False:
+		if 'username_prompt' in self.mud_info.keys() == False or self.mud_info['username_prompt'] == None:
 			self.exit("Auto login failed, no username prompt provided. Please add this to your info dictionary passed to the framework's constructor")
 		# We should be connected
 		if self.mud_info['pre_username']: # if we have commands to send before sending username_command
@@ -141,6 +141,8 @@ class Mbf(object):
 		if r[0] == -1 and r[1] == None: # expect timed out because username_prompt didn't match or didn't arrive within timeout
 			self.exit("Timeout while waiting for username prompt! \nThis could mean your username_prompt regular expression is incorrect or your network connection or that of the mud is too slow for the set timeout. \nMake sure your login_prompt regular expression is matching on your mud's login string, check your network connection, and try increasing the timeout value.")
 		else:
+			# we know it matched because if r[0] was anything other than -1, expect() didn't time out, and returned an index insead;
+			# the username prompt is the only item in the list
 			self.log.debug("Matched username prompt")
 		if self.mud_info['username_command']:
 			# Send the username command, providing the credentials dict so the user has access to username and password values
@@ -157,9 +159,12 @@ class Mbf(object):
 			l.append(self.mud_info['password_prompt']) # We have a password prompt regexp, so we add it to the expected list of regexps
 			self.log.debug("Added the password_prompt regexp to the list of regular expressions we're looking to match")
 		self.log.debug("Expecting a regular expression")
+		# we're expecting either the username_wrong regexp, or the password_prompt one as well, if it's given
 		r = self.expect(l, self.timeout)
 		if r[0] == -1 and r[1] == None:
-			self.exit("Timeout while waiting for either the incorrect username or password regular expressions to match! \nThis could mean your wrong_username or incorrect_password regular expressions are not matching or your network connection or that of the mud is too slow for the set timeout. \nMake sure your wrong_username and incorrect_password regular expressions are matching on your mud's strings, check your network connection, and try increasing the timeout value.")
+			# No regular expression matched
+			if self.mud_info['password_prompt']: # a password prompt was given, but it did not match; exit
+				self.exit("Timeout while waiting for either the incorrect username or password prompt regular expressions to match! \nThis could mean your wrong_username or password_prompt regular expressions are not matching or your network connection or that of the mud is too slow for the set timeout. \nMake sure your wrong_username and password_prompt regular expressions are matching on your mud's strings, check your network connection, and try increasing the timeout value.")
 		elif l[r[0]] != self.mud_info['username_wrong']: # if the matching regexp is not username_wrong
 			self.log.debug("The regular expression matched was not the one for an incorrect username")
 			if self.mud_info['post_username']:
@@ -168,7 +173,7 @@ class Mbf(object):
 		else: # incorrect username
 			self.exit("Incorrect username.")
 		
-		if self.mud_info['password_prompt'] and self.mud_info['password_command'] and l[r[0]] == self.mud_info['password_prompt']: # if we have a password prompt and command and the password prompt regexp matched
+		if self.mud_info['password_prompt'] and self.mud_info['password_command'] and l[r[0]] == self.mud_info['password_prompt'] and self.mud_info['password_prompt'] != None: # if we have a password prompt and command (and the prompt is not none) and the password prompt regexp matched
 			self.log.debug("Password prompt and command were given, and the matching regular expression is password_correct")
 			# First, run pre_password commands if any:
 			if self.mud_info['pre_password']:
