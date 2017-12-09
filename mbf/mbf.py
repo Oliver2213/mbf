@@ -158,7 +158,9 @@ class Mbf(object):
 			self.log.debug("Added the password_prompt regexp to the list of regular expressions we're looking to match")
 		self.log.debug("Expecting a regular expression")
 		r = self.expect(l, self.timeout)
-		if l[r[0]] != self.mud_info['username_wrong']: # if the matching regexp is not username_wrong
+		if r[0] == -1 and r[1] == None:
+			self.exit("Timeout while waiting for either the incorrect username or password regular expressions to match! \nThis could mean your wrong_username or incorrect_password regular expressions are not matching or your network connection or that of the mud is too slow for the set timeout. \nMake sure your wrong_username and incorrect_password regular expressions are matching on your mud's strings, check your network connection, and try increasing the timeout value.")
+		elif l[r[0]] != self.mud_info['username_wrong']: # if the matching regexp is not username_wrong
 			self.log.debug("The regular expression matched was not the one for an incorrect username")
 			if self.mud_info['post_username']:
 				self.log.debug("Sending post-username commands")
@@ -182,7 +184,9 @@ class Mbf(object):
 				self.log.debug("Added the password_correct regular expression to the list of expected matches")
 			self.log.debug("Expecting a password-related regular expression to match")
 			r = self.expect(l, self.timeout)
-			if l[r[0]] == self.mud_info['password_correct']: # the password_correct regexp matches
+			if r[0] == -1 and r[1] == None:
+				self.exit("Timeout while waiting for either the password_correct or password_wrong regular expressions to match.\rThis usually means one of them is written incorrectly. Check them, as well as the strings your mud sends, or try increasing the timeout value.")
+			elif l[r[0]] == self.mud_info['password_correct']: # the password_correct regexp matches
 				# Login successful
 				self.log.info("Successfully logged in")
 				# do successful things here
