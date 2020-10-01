@@ -13,9 +13,8 @@ def match_regexp_list(r_list, string):
 			res_tuple = regexp, match
 			r.append(res_tuple)
 	if len(r) == 0:
-		returnFalse
-	else:
-		return r
+		return False
+	return r
 
 def process_info_dict(d):
 	"""Given a dictionary describing the various prompts and strings a mud sends at login, convert all items that mbf is expecting to be regular expressions into compiled re objects.

@@ -67,13 +67,11 @@ class Trigger(object):
 		if self.is_regexp:
 			if self.trig.search(string):
 				return True
-			else: # No matches for this regexp trigger on given string
-				return False
+			return False # No matches for this regexp trigger on given string
 		elif self.is_regexp == False:
 			if self.trig in string:
 				return True
-			else: # text trigger string not found in given data
-				return False
+			return False # text trigger string not found in given data
 	
 	def fire(self, string):
 		"""Fires this trigger by running the function associated with it.

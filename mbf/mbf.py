@@ -69,10 +69,9 @@ class Mbf(object):
 			self.credentials={} # Create a credentials dict so later these values can be used in login command strings
 			self.credentials['username'] = username
 			self.credentials['password'] = password
-		else: # we don't know username or password
-			if self.auto_login:
-				self.log.warn("Mbf was told to manage logins, but was not provided a username and password; disabling automatic login management")
-				self.auto_login = False # we can't manage logins
+		elif self.auto_login: # we don't know username or password but are told to auto-login
+			self.log.warn("Mbf was told to manage logins, but was not provided a username and password; disabling automatic login management")
+			self.auto_login = False # we can't manage logins
 		
 		# self.connected is a boolean that indicates whether this instance of mbf is currently connected to a mud.
 		# At first, this is set to false, but connect() sets this to the telnet object's 'eof'
