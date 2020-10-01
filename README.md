@@ -1,4 +1,4 @@
-#MBF - The Mud Bot Framework
+# MBF - The Mud Bot Framework
 
 Mbf is a small library to allow for easily creating mud bots. While MUDing might not be as popular as it once was, it's still thriving today and so are those wonderfully automatic, carefully coded (or not!), helpful (or harmful!), pieces of code we call bots. From the simple 2 trigger one alias to the bewilderingly complex, bots have existed in some form or another as long as people have been lazy (since like, forever). Usually you have a client which lets you send commands to the mud by typing them and (optionally) lets you make aliases and triggers. My personal favorite is [MUSHclient](http://www.gammon.com.au/mushclient/mushclient.htm), which supports all the bells and whistles of alias and trigger creation, packaging sets of these (plus timers and variables) up into plugins for fellow botters to use.  
 There's only one problem: while it comes with lua working out of the box, and does support more than a handful of languages, getting python up and working with mush using it as the default scripting engine was sadly beyond me and those I know.
@@ -26,7 +26,7 @@ Not all of these need to be specified; mbf will, for example, assume that the lo
 
 Here's an example of making a simple tell trigger. It connects to the mud [Alter Aeon](https://alteraeon.com) and (when someone sends it a tell), responds with a random response, and tells it's "master" what the person told it. It also uses the mudinfo module, which I intend to hold configurations for several popular muds in the future.
 
-```
+```python
 # Mbf Test Bot!
 
 import random
