@@ -46,10 +46,7 @@ class Timer(object):
 				self.run_count += 1
 			else: # no more runs for this timer
 				self.job.remove()
-		else:
-			# throw a specific exception here that has yet to be created
-			pass
-	
+
 	@property
 	def enabled(self):
 		return self._enabled
